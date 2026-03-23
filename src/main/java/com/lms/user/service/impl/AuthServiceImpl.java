@@ -10,10 +10,13 @@ import org.springframework.stereotype.Service;
 import com.lms.notification.service.EmailService;
 import com.lms.shared.exception.BadRequestException;
 import com.lms.shared.jwt.JwtUtil;
+import com.lms.user.dto.request.ForgotPasswordRequestDto;
 import com.lms.user.dto.request.LoginRequestDto;
 import com.lms.user.dto.request.RegisterRequestDto;
 import com.lms.user.dto.request.ResendOtpRequestDto;
+import com.lms.user.dto.request.ResetPasswordRequestDto;
 import com.lms.user.dto.request.VerifyOtpRequestDto;
+import com.lms.user.dto.request.VerifyPasswordResetOtpRequestDto;
 import com.lms.user.dto.response.AuthResponseDto;
 import com.lms.user.dto.response.UserResponseDto;
 import com.lms.user.entity.User;
@@ -118,6 +121,79 @@ public class AuthServiceImpl implements AuthService {
 		}
 		String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
 		return AuthResponseDto.builder().accessToken(token).user(modelMapper.map(user, UserResponseDto.class)).build();
+	}
+
+	@Override
+	public void requestPasswordResetOtp(ForgotPasswordRequestDto request) {
+		User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+		if (user == null) {
+			return;
+		}
+
+		if (user.getStatus() != UserStatus.ACTIVE || !Boolean.TRUE.equals(user.getEmailVerified())) {
+			return;
+		}
+
+		String otp = generateOtp();
+		user.setPasswordResetOtp(otp);
+		user.setPasswordResetOtpExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
+		user.setPasswordResetOtpVerified(false);
+		userRepository.save(user);
+
+		emailService.sendPasswordResetOtpEmail(user.getEmail(), user.getFullName(), otp);
+	}
+
+	@Override
+	public void verifyPasswordResetOtp(VerifyPasswordResetOtpRequestDto request) {
+		User user = userRepository.findByEmail(request.getEmail())
+				.orElseThrow(() -> new BadRequestException("Invalid email or OTP"));
+
+		if (user.getStatus() != UserStatus.ACTIVE) {
+			throw new BadRequestException("Your account is not active. Please contact support.");
+		}
+		if (user.getPasswordResetOtp() == null || user.getPasswordResetOtpExpiresAt() == null) {
+			throw new BadRequestException("Reset OTP not generated. Please request a new OTP.");
+		}
+		if (LocalDateTime.now().isAfter(user.getPasswordResetOtpExpiresAt())) {
+			throw new BadRequestException("Reset OTP has expired. Please request a new OTP.");
+		}
+		if (!request.getOtp().equals(user.getPasswordResetOtp())) {
+			throw new BadRequestException("Invalid OTP");
+		}
+
+		user.setPasswordResetOtpVerified(true);
+		userRepository.save(user);
+	}
+
+	@Override
+	public void resetPassword(ResetPasswordRequestDto request) {
+		User user = userRepository.findByEmail(request.getEmail())
+				.orElseThrow(() -> new BadRequestException("Invalid reset request"));
+
+		if (user.getStatus() != UserStatus.ACTIVE) {
+			throw new BadRequestException("Your account is not active. Please contact support.");
+		}
+		if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+			throw new BadRequestException("New password and confirm password do not match");
+		}
+		if (user.getPasswordResetOtp() == null || user.getPasswordResetOtpExpiresAt() == null) {
+			throw new BadRequestException("Reset OTP not generated. Please request a new OTP.");
+		}
+		if (LocalDateTime.now().isAfter(user.getPasswordResetOtpExpiresAt())) {
+			throw new BadRequestException("Reset OTP has expired. Please request a new OTP.");
+		}
+		if (!request.getOtp().equals(user.getPasswordResetOtp())) {
+			throw new BadRequestException("Invalid OTP");
+		}
+		if (!Boolean.TRUE.equals(user.getPasswordResetOtpVerified())) {
+			throw new BadRequestException("Please verify reset OTP before changing password");
+		}
+
+		user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+		user.setPasswordResetOtp(null);
+		user.setPasswordResetOtpExpiresAt(null);
+		user.setPasswordResetOtpVerified(false);
+		userRepository.save(user);
 	}
 
 	private String generateOtp() {

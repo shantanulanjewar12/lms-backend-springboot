@@ -47,6 +47,18 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public void sendPasswordResetOtpEmail(String to, String fullName, String otp) {
+        String subject = "Password reset OTP - Let's Learn";
+        String body = buildTemplate(
+                "Reset your password",
+                "Hi " + safeName(fullName)
+                        + ", use the OTP below to verify your password reset request.",
+                "OTP: <strong style='font-size:22px;letter-spacing:3px;'>" + otp + "</strong>",
+                "This OTP is valid for 10 minutes. If you did not request this, please ignore this email.");
+        sendHtmlEmail(to, subject, body);
+    }
+
+    @Override
     public void sendCourseCreatedEmail(String to, String fullName, String courseTitle) {
         String subject = "Course created successfully - Let's Learn";
         String body = buildTemplate(

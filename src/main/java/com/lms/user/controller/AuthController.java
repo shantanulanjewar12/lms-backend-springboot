@@ -8,10 +8,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.lms.shared.dto.ApiResponse;
+import com.lms.user.dto.request.ForgotPasswordRequestDto;
 import com.lms.user.dto.request.LoginRequestDto;
 import com.lms.user.dto.request.RegisterRequestDto;
 import com.lms.user.dto.request.ResendOtpRequestDto;
+import com.lms.user.dto.request.ResetPasswordRequestDto;
 import com.lms.user.dto.request.VerifyOtpRequestDto;
+import com.lms.user.dto.request.VerifyPasswordResetOtpRequestDto;
 import com.lms.user.dto.response.AuthResponseDto;
 import com.lms.user.service.AuthService;
 
@@ -45,5 +48,25 @@ public class AuthController {
 	public ResponseEntity<ApiResponse<Void>> resendOtp(@Valid @RequestBody ResendOtpRequestDto request) {
 		authService.resendOtp(request);
 		return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
+	}
+
+	@PostMapping("/forgot-password")
+	public ResponseEntity<ApiResponse<Void>> requestForgotPasswordOtp(
+			@Valid @RequestBody ForgotPasswordRequestDto request) {
+		authService.requestPasswordResetOtp(request);
+		return ResponseEntity.ok(ApiResponse.success("If account exists, password reset OTP has been sent"));
+	}
+
+	@PostMapping("/forgot-password/verify-otp")
+	public ResponseEntity<ApiResponse<Void>> verifyForgotPasswordOtp(
+			@Valid @RequestBody VerifyPasswordResetOtpRequestDto request) {
+		authService.verifyPasswordResetOtp(request);
+		return ResponseEntity.ok(ApiResponse.success("OTP verified successfully"));
+	}
+
+	@PostMapping("/forgot-password/reset")
+	public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
+		authService.resetPassword(request);
+		return ResponseEntity.ok(ApiResponse.success("Password reset successful"));
 	}
 }

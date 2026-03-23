@@ -66,6 +66,16 @@ public class User {
     @Column(name = "email_otp_expires_at")
     private LocalDateTime emailOtpExpiresAt;
 
+    @Column(name = "password_reset_otp", length = 6)
+    private String passwordResetOtp;
+
+    @Column(name = "password_reset_otp_expires_at")
+    private LocalDateTime passwordResetOtpExpiresAt;
+
+    @Builder.Default
+    @Column(name = "password_reset_otp_verified")
+    private Boolean passwordResetOtpVerified = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

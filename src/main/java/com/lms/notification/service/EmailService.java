@@ -8,6 +8,8 @@ public interface EmailService {
 
     void sendWelcomeEmail(String to, String fullName);
 
+    void sendPasswordResetOtpEmail(String to, String fullName, String otp);
+
     void sendCourseCreatedEmail(String to, String fullName, String courseTitle);
 
     void sendEnrollmentEmail(String to, String fullName, String courseTitle);

@@ -2,6 +2,7 @@ package com.lms.analytics.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,7 +31,10 @@ public class StudentAnalyticsController {
 
 	@GetMapping("/learning-path")
 	@PreAuthorize("hasRole('STUDENT')")
-	public ResponseEntity<ApiResponse<LearningPathResponseDto>> getLearningPath(@RequestParam String goal) {
-		return ResponseEntity.ok(ApiResponse.success("Learning path", studentAnalyticsService.getLearningPath(goal)));
+	public ResponseEntity<ApiResponse<LearningPathResponseDto>> getLearningPath(@RequestParam String goal,
+			Authentication auth) {
+		Long studentId = (Long) auth.getCredentials();
+		return ResponseEntity
+				.ok(ApiResponse.success("Learning path", studentAnalyticsService.getLearningPath(studentId, goal)));
 	}
 }

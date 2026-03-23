@@ -11,6 +11,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.lms.user.repository.UserRepository;
+import com.lms.user.vo.UserStatus;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -19,6 +22,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -42,6 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String email = jwtUtil.extractEmail(token);
         String role = jwtUtil.extractRole(token);
         Long userId = jwtUtil.extractUserId(token);
+
+        boolean isActive = userRepository.findById(userId)
+            .map(user -> user.getStatus() == UserStatus.ACTIVE)
+            .orElse(false);
+
+        if (!isActive) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Account suspended or inactive");
+            return;
+        }
 
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(

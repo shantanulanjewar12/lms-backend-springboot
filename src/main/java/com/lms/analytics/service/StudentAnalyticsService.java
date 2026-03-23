@@ -6,5 +6,5 @@ import com.lms.analytics.dto.response.StudentProgressSummaryDto;
 public interface StudentAnalyticsService {
 	StudentProgressSummaryDto getStudentSummary(Long studentId);
 
-	LearningPathResponseDto getLearningPath(String goal);
+	LearningPathResponseDto getLearningPath(Long studentId, String goal);
 }

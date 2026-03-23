@@ -15,6 +15,7 @@ import com.lms.course.service.ReviewService;
 import com.lms.enrollment.repository.EnrollmentRepository;
 import com.lms.shared.exception.BadRequestException;
 import com.lms.shared.exception.ResourceNotFoundException;
+import com.lms.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,6 +27,7 @@ public class ReviewServiceImpl implements ReviewService {
 	private final CourseService courseService;
 	private final EnrollmentRepository enrollmentRepository;
 	private final ModelMapper modelMapper;
+	private final UserRepository userRepository;
 
 	@Override
 	public ReviewResponseDto submitReview(Long courseId, Long studentId, SubmitReviewRequestDto request) {
@@ -40,6 +42,7 @@ public class ReviewServiceImpl implements ReviewService {
 		Review saved = reviewRepository.save(review);
 		ReviewResponseDto dto = modelMapper.map(saved, ReviewResponseDto.class);
 		dto.setCourseId(courseId);
+		dto.setStudentName(userRepository.findById(studentId).map(u -> u.getFullName()).orElse(null));
 		return dto;
 	}
 
@@ -48,6 +51,7 @@ public class ReviewServiceImpl implements ReviewService {
 		return reviewRepository.findByCourseId(courseId).stream().map(r -> {
 			ReviewResponseDto dto = modelMapper.map(r, ReviewResponseDto.class);
 			dto.setCourseId(courseId);
+			dto.setStudentName(userRepository.findById(r.getStudentId()).map(u -> u.getFullName()).orElse(null));
 			return dto;
 		}).toList();
 	}

@@ -19,6 +19,7 @@ import com.lms.user.dto.response.UserResponseDto;
 import com.lms.user.entity.User;
 import com.lms.user.repository.UserRepository;
 import com.lms.user.service.AuthService;
+import com.lms.user.vo.UserStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -56,6 +57,10 @@ public class AuthServiceImpl implements AuthService {
 	public AuthResponseDto verifyOtp(VerifyOtpRequestDto request) {
 		User user = userRepository.findByEmail(request.getEmail())
 				.orElseThrow(() -> new BadRequestException("User not found with this email"));
+
+		if (user.getStatus() != UserStatus.ACTIVE) {
+			throw new BadRequestException("Your account is not active. Please contact support.");
+		}
 
 		if (Boolean.TRUE.equals(user.getEmailVerified())) {
 			throw new BadRequestException("Email is already verified");
@@ -107,6 +112,9 @@ public class AuthServiceImpl implements AuthService {
 		}
 		if (!Boolean.TRUE.equals(user.getEmailVerified())) {
 			throw new BadRequestException("Please verify your email before logging in");
+		}
+		if (user.getStatus() != UserStatus.ACTIVE) {
+			throw new BadRequestException("Your account is suspended or inactive. Please contact support.");
 		}
 		String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
 		return AuthResponseDto.builder().accessToken(token).user(modelMapper.map(user, UserResponseDto.class)).build();

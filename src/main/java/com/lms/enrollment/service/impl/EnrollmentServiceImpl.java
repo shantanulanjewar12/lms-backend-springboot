@@ -1,5 +1,6 @@
 package com.lms.enrollment.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
@@ -15,6 +16,7 @@ import com.lms.enrollment.entity.Enrollment;
 import com.lms.enrollment.repository.EnrollmentRepository;
 import com.lms.enrollment.repository.LessonProgressRepository;
 import com.lms.enrollment.service.EnrollmentService;
+import com.lms.enrollment.vo.EnrollmentStatus;
 import com.lms.notification.service.EmailService;
 import com.lms.shared.exception.BadRequestException;
 import com.lms.shared.exception.ResourceNotFoundException;
@@ -87,6 +89,21 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 		dto.setCourseThumbnailUrl(s3StorageService.getAccessibleFileUrl(course.getThumbnailUrl()));
 		long total = lessonRepository.countByCourseId(enrollment.getCourseId());
 		long completed = lessonProgressRepository.countByEnrollmentIdAndIsCompletedTrue(enrollment.getId());
+
+		if (total > 0 && completed >= total && enrollment.getStatus() != EnrollmentStatus.COMPLETED) {
+			enrollment.setStatus(EnrollmentStatus.COMPLETED);
+			enrollment.setCompletedAt(LocalDateTime.now());
+			enrollmentRepository.save(enrollment);
+			dto.setStatus(EnrollmentStatus.COMPLETED);
+			dto.setCompletedAt(enrollment.getCompletedAt());
+		} else if (total > 0 && completed < total && enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+			enrollment.setStatus(EnrollmentStatus.ACTIVE);
+			enrollment.setCompletedAt(null);
+			enrollmentRepository.save(enrollment);
+			dto.setStatus(EnrollmentStatus.ACTIVE);
+			dto.setCompletedAt(null);
+		}
+
 		dto.setCompletionPercentage(total > 0 ? (completed * 100.0 / total) : 0.0);
 		return dto;
 	}

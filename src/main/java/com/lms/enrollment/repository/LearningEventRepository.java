@@ -12,6 +12,8 @@ import com.lms.enrollment.vo.LearningEventType;
 public interface LearningEventRepository extends JpaRepository<LearningEvent, Long> {
 	List<LearningEvent> findByLessonId(Long lessonId);
 
+	void deleteByLessonId(Long lessonId);
+
 	List<LearningEvent> findByStudentIdAndEventType(Long studentId, LearningEventType eventType);
 
 	long countByLessonIdAndEventType(Long lessonId, LearningEventType eventType);

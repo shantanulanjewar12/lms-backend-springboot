@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.lms.course.dto.request.CreateLessonRequestDto;
@@ -11,9 +12,12 @@ import com.lms.course.dto.response.LessonResponseDto;
 import com.lms.course.entity.Course;
 import com.lms.course.entity.Lesson;
 import com.lms.course.repository.LessonRepository;
+import com.lms.course.repository.QuizQuestionRepository;
 import com.lms.course.service.CourseService;
 import com.lms.course.service.LessonService;
 import com.lms.course.service.S3StorageService;
+import com.lms.enrollment.repository.LearningEventRepository;
+import com.lms.enrollment.repository.LessonProgressRepository;
 import com.lms.shared.exception.ResourceNotFoundException;
 import com.lms.shared.exception.UnauthorizedException;
 
@@ -27,6 +31,9 @@ public class LessonServiceImpl implements LessonService {
 	private final CourseService courseService;
 	private final S3StorageService s3StorageService;
 	private final ModelMapper modelMapper;
+	private final QuizQuestionRepository quizQuestionRepository;
+	private final LessonProgressRepository lessonProgressRepository;
+	private final LearningEventRepository learningEventRepository;
 
 	@Override
 	public LessonResponseDto createLesson(Long instructorId, CreateLessonRequestDto request, MultipartFile file) {
@@ -72,10 +79,16 @@ public class LessonServiceImpl implements LessonService {
 	}
 
 	@Override
+	@Transactional
 	public void deleteLesson(Long lessonId, Long instructorId) {
 		Lesson lesson = getLessonEntityById(lessonId);
 		if (!lesson.getCourse().getInstructorId().equals(instructorId))
 			throw new UnauthorizedException("Not authorized");
+
+		// Remove child rows first to satisfy FK constraints for quiz lessons.
+		quizQuestionRepository.deleteByLessonId(lessonId);
+		lessonProgressRepository.deleteByLessonId(lessonId);
+		learningEventRepository.deleteByLessonId(lessonId);
 		lessonRepository.delete(lesson);
 	}
 

@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.lms.notification.service.EmailService;
+import com.lms.course.service.S3StorageService;
 import com.lms.shared.exception.BadRequestException;
 import com.lms.shared.jwt.JwtUtil;
 import com.lms.user.dto.request.ForgotPasswordRequestDto;
@@ -35,6 +36,7 @@ public class AuthServiceImpl implements AuthService {
 	private final JwtUtil jwtUtil;
 	private final ModelMapper modelMapper;
 	private final EmailService emailService;
+	private final S3StorageService s3StorageService;
 
 	private static final long OTP_EXPIRY_MINUTES = 10;
 
@@ -53,7 +55,7 @@ public class AuthServiceImpl implements AuthService {
 
 		emailService.sendRegistrationOtpEmail(saved.getEmail(), saved.getFullName(), otp);
 
-		return AuthResponseDto.builder().accessToken(null).user(modelMapper.map(saved, UserResponseDto.class)).build();
+		return AuthResponseDto.builder().accessToken(null).user(toUserResponseDto(saved)).build();
 	}
 
 	@Override
@@ -86,7 +88,7 @@ public class AuthServiceImpl implements AuthService {
 		emailService.sendWelcomeEmail(saved.getEmail(), saved.getFullName());
 
 		String token = jwtUtil.generateToken(saved.getId(), saved.getEmail(), saved.getRole().name());
-		return AuthResponseDto.builder().accessToken(token).user(modelMapper.map(saved, UserResponseDto.class)).build();
+		return AuthResponseDto.builder().accessToken(token).user(toUserResponseDto(saved)).build();
 	}
 
 	@Override
@@ -120,7 +122,13 @@ public class AuthServiceImpl implements AuthService {
 			throw new BadRequestException("Your account is suspended or inactive. Please contact support.");
 		}
 		String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
-		return AuthResponseDto.builder().accessToken(token).user(modelMapper.map(user, UserResponseDto.class)).build();
+		return AuthResponseDto.builder().accessToken(token).user(toUserResponseDto(user)).build();
+	}
+
+	private UserResponseDto toUserResponseDto(User user) {
+		UserResponseDto dto = modelMapper.map(user, UserResponseDto.class);
+		dto.setProfilePic(s3StorageService.getAccessibleFileUrl(dto.getProfilePic()));
+		return dto;
 	}
 
 	@Override

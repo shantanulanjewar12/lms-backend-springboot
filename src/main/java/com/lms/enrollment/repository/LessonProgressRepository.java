@@ -12,6 +12,8 @@ import com.lms.enrollment.entity.LessonProgress;
 public interface LessonProgressRepository extends JpaRepository<LessonProgress, Long> {
 	List<LessonProgress> findByEnrollmentId(Long enrollmentId);
 
+	void deleteByLessonId(Long lessonId);
+
 	Optional<LessonProgress> findByEnrollmentIdAndLessonId(Long enrollmentId, Long lessonId);
 
 	long countByEnrollmentIdAndIsCompletedTrue(Long enrollmentId);

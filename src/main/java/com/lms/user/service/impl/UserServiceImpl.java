@@ -28,14 +28,14 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public UserResponseDto getUserById(Long id) {
 		User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
-		return modelMapper.map(user, UserResponseDto.class);
+		return toUserResponseDto(user);
 	}
 
 	@Override
 	public UserResponseDto getUserByEmail(String email) {
 		User user = userRepository.findByEmail(email)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
-		return modelMapper.map(user, UserResponseDto.class);
+		return toUserResponseDto(user);
 	}
 
 	@Override
@@ -51,9 +51,13 @@ public class UserServiceImpl implements UserService {
 			user.setFullName(request.getFullName());
 		if (request.getBio() != null)
 			user.setBio(request.getBio());
-		if (request.getProfilePicUrl() != null)
-			user.setProfilePic(request.getProfilePicUrl());
-		return modelMapper.map(userRepository.save(user), UserResponseDto.class);
+		if (request.getProfilePicUrl() != null) {
+			String profilePicUrl = request.getProfilePicUrl();
+			// Do not persist presigned query parameters; keep stable object URL/key length.
+			int queryIndex = profilePicUrl.indexOf('?');
+			user.setProfilePic(queryIndex >= 0 ? profilePicUrl.substring(0, queryIndex) : profilePicUrl);
+		}
+		return toUserResponseDto(userRepository.save(user));
 	}
 
 	@Override
@@ -62,19 +66,19 @@ public class UserServiceImpl implements UserService {
 		String url = s3StorageService.uploadFile(file, "profiles");
 		user.setProfilePic(url);
 		userRepository.save(user);
-		return url;
+		return s3StorageService.getAccessibleFileUrl(url);
 	}
 
 	@Override
 	public Page<UserResponseDto> getAllUsers(Pageable pageable) {
-		return userRepository.findAll(pageable).map(u -> modelMapper.map(u, UserResponseDto.class));
+		return userRepository.findAll(pageable).map(this::toUserResponseDto);
 	}
 
 	@Override
 	public UserResponseDto updateUserStatus(Long id, UserStatus status) {
 		User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
 		user.setStatus(status);
-		return modelMapper.map(userRepository.save(user), UserResponseDto.class);
+		return toUserResponseDto(userRepository.save(user));
 	}
 
 	@Override
@@ -82,5 +86,11 @@ public class UserServiceImpl implements UserService {
 		if (!userRepository.existsById(id))
 			throw new ResourceNotFoundException("User", id);
 		userRepository.deleteById(id);
+	}
+
+	private UserResponseDto toUserResponseDto(User user) {
+		UserResponseDto dto = modelMapper.map(user, UserResponseDto.class);
+		dto.setProfilePic(s3StorageService.getAccessibleFileUrl(dto.getProfilePic()));
+		return dto;
 	}
 }

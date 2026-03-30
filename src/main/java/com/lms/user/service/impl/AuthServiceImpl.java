@@ -61,7 +61,7 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public AuthResponseDto verifyOtp(VerifyOtpRequestDto request) {
 		User user = userRepository.findByEmail(request.getEmail())
-				.orElseThrow(() -> new BadRequestException("User not found with this email"));
+				.orElseThrow(() -> new BadRequestException("User not found with this email."));
 
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BadRequestException("Your account is not active. Please contact support.");

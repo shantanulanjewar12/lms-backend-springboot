@@ -56,7 +56,7 @@ stripe:
   publishable-key: ${STRIPE_PUBLIC_KEY}
   secret-key: ${STRIPE_SECRET_KEY}
   webhook-secret: dummy
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  frontend-url: https://development.dzt6pjgfqs25v.amplifyapp.com/
 
 # Springdoc
 springdoc:

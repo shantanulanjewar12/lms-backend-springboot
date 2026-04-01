@@ -6,6 +6,7 @@ import java.util.List;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
+import lombok.extern.slf4j.Slf4j;
 import com.lms.course.entity.Course;
 import com.lms.course.repository.LessonRepository;
 import com.lms.course.service.CourseService;
@@ -25,6 +26,7 @@ import com.lms.user.service.UserService;
 
 import lombok.RequiredArgsConstructor;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EnrollmentServiceImpl implements EnrollmentService {
@@ -84,27 +86,51 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
 	private EnrollmentResponseDto toDto(Enrollment enrollment) {
 		EnrollmentResponseDto dto = modelMapper.map(enrollment, EnrollmentResponseDto.class);
-		Course course = courseService.getCourseEntityById(enrollment.getCourseId());
-		dto.setCourseTitle(course.getTitle());
-		dto.setCourseThumbnailUrl(s3StorageService.getAccessibleFileUrl(course.getThumbnailUrl()));
-		long total = lessonRepository.countByCourseId(enrollment.getCourseId());
-		long completed = lessonProgressRepository.countByEnrollmentIdAndIsCompletedTrue(enrollment.getId());
+		
+		try {
+			// Try to fetch course details
+			try {
+				Course course = courseService.getCourseEntityById(enrollment.getCourseId());
+				dto.setCourseTitle(course.getTitle());
+				try {
+					dto.setCourseThumbnailUrl(s3StorageService.getAccessibleFileUrl(course.getThumbnailUrl()));
+				} catch (Exception e) {
+					log.warn("Failed to get thumbnail URL for course {}: {}", enrollment.getCourseId(), e.getMessage());
+					dto.setCourseThumbnailUrl(null);
+				}
+			} catch (Exception e) {
+				log.warn("Course not found for enrollment {}: {}", enrollment.getId(), e.getMessage());
+				dto.setCourseTitle("Course #" + enrollment.getCourseId());
+			}
+			
+			// Calculate completion percentage
+			try {
+				long total = lessonRepository.countByCourseId(enrollment.getCourseId());
+				long completed = lessonProgressRepository.countByEnrollmentIdAndIsCompletedTrue(enrollment.getId());
 
-		if (total > 0 && completed >= total && enrollment.getStatus() != EnrollmentStatus.COMPLETED) {
-			enrollment.setStatus(EnrollmentStatus.COMPLETED);
-			enrollment.setCompletedAt(LocalDateTime.now());
-			enrollmentRepository.save(enrollment);
-			dto.setStatus(EnrollmentStatus.COMPLETED);
-			dto.setCompletedAt(enrollment.getCompletedAt());
-		} else if (total > 0 && completed < total && enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
-			enrollment.setStatus(EnrollmentStatus.ACTIVE);
-			enrollment.setCompletedAt(null);
-			enrollmentRepository.save(enrollment);
-			dto.setStatus(EnrollmentStatus.ACTIVE);
-			dto.setCompletedAt(null);
+				if (total > 0 && completed >= total && enrollment.getStatus() != EnrollmentStatus.COMPLETED) {
+					enrollment.setStatus(EnrollmentStatus.COMPLETED);
+					enrollment.setCompletedAt(LocalDateTime.now());
+					enrollmentRepository.save(enrollment);
+					dto.setStatus(EnrollmentStatus.COMPLETED);
+					dto.setCompletedAt(enrollment.getCompletedAt());
+				} else if (total > 0 && completed < total && enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+					enrollment.setStatus(EnrollmentStatus.ACTIVE);
+					enrollment.setCompletedAt(null);
+					enrollmentRepository.save(enrollment);
+					dto.setStatus(EnrollmentStatus.ACTIVE);
+					dto.setCompletedAt(null);
+				}
+
+				dto.setCompletionPercentage(total > 0 ? (completed * 100.0 / total) : 0.0);
+			} catch (Exception e) {
+				log.warn("Failed to calculate progress for enrollment {}: {}", enrollment.getId(), e.getMessage());
+				dto.setCompletionPercentage(0.0);
+			}
+		} catch (Exception e) {
+			log.error("Error converting enrollment {} to DTO: {}", enrollment.getId(), e.getMessage(), e);
 		}
-
-		dto.setCompletionPercentage(total > 0 ? (completed * 100.0 / total) : 0.0);
+		
 		return dto;
 	}
 }

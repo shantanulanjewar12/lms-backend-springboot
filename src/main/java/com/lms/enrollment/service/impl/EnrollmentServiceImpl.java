@@ -1,7 +1,9 @@
 package com.lms.enrollment.service.impl;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import com.lms.course.entity.Course;
 import com.lms.course.repository.LessonRepository;
 import com.lms.course.service.CourseService;
 import com.lms.course.service.S3StorageService;
+import com.lms.course.vo.CourseLevel;
 import com.lms.enrollment.dto.request.EnrollRequestDto;
 import com.lms.enrollment.dto.response.EnrollmentResponseDto;
 import com.lms.enrollment.entity.Enrollment;
@@ -50,7 +53,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 		if (enrollmentRepository.existsByStudentIdAndCourseId(studentId, courseId))
 			throw new BadRequestException("Already enrolled in this course");
 		Course course = courseService.getCourseEntityById(courseId); // validate course exists
-		Enrollment enrollment = Enrollment.builder().studentId(studentId).courseId(courseId).build();
+		LocalDateTime enrolledAt = LocalDateTime.now();
+		Enrollment enrollment = Enrollment.builder().studentId(studentId).courseId(courseId).enrolledAt(enrolledAt)
+				.expiresAt(calculateExpiryDate(enrolledAt, course.getLevel())).build();
 		Enrollment saved = enrollmentRepository.save(enrollment);
 
 		try {
@@ -65,7 +70,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
 	@Override
 	public List<EnrollmentResponseDto> getMyEnrollments(Long studentId) {
-		return enrollmentRepository.findByStudentId(studentId).stream().map(this::toDto).toList();
+		return enrollmentRepository.findByStudentId(studentId).stream().map(enrollment -> {
+			try {
+				courseService.getCourseEntityById(enrollment.getCourseId());
+				return toDto(enrollment);
+			} catch (ResourceNotFoundException e) {
+				log.info("Deleting orphan enrollment {} for missing course {}", enrollment.getId(), enrollment.getCourseId());
+				enrollmentRepository.delete(enrollment);
+				return null;
+			}
+		}).filter(Objects::nonNull).toList();
 	}
 
 	@Override
@@ -86,6 +100,12 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
 	private EnrollmentResponseDto toDto(Enrollment enrollment) {
 		EnrollmentResponseDto dto = modelMapper.map(enrollment, EnrollmentResponseDto.class);
+		boolean accessExpired = enrollment.getExpiresAt() != null && LocalDateTime.now().isAfter(enrollment.getExpiresAt());
+		dto.setAccessExpired(accessExpired);
+		if (enrollment.getExpiresAt() != null) {
+			long remainingDays = ChronoUnit.DAYS.between(LocalDateTime.now(), enrollment.getExpiresAt());
+			dto.setRemainingDays(Math.max(remainingDays, 0));
+		}
 		
 		try {
 			// Try to fetch course details
@@ -132,5 +152,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 		}
 		
 		return dto;
+	}
+
+	private LocalDateTime calculateExpiryDate(LocalDateTime enrolledAt, CourseLevel level) {
+		if (level == null) {
+			return enrolledAt.plusMonths(6);
+		}
+		return switch (level) {
+		case BEGINNER -> enrolledAt.plusMonths(6);
+		case INTERMEDIATE -> enrolledAt.plusYears(1);
+		case ADVANCED -> enrolledAt.plusMonths(18);
+		};
 	}
 }

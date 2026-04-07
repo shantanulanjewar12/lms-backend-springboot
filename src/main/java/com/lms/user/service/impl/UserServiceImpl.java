@@ -13,6 +13,7 @@ import com.lms.user.dto.response.UserResponseDto;
 import com.lms.user.entity.User;
 import com.lms.user.repository.UserRepository;
 import com.lms.user.service.UserService;
+import com.lms.user.vo.UserRole;
 import com.lms.user.vo.UserStatus;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,8 @@ public class UserServiceImpl implements UserService {
 		return toUserResponseDto(user);
 	}
 
+	
+	
 	@Override
 	public UserResponseDto getUserByEmail(String email) {
 		User user = userRepository.findByEmail(email)
@@ -38,30 +41,38 @@ public class UserServiceImpl implements UserService {
 		return toUserResponseDto(user);
 	}
 
+	
+	
 	@Override
 	public User getUserEntityByEmail(String email) {
 		return userRepository.findByEmail(email)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
 	}
 
+	
+	
 	@Override
 	public UserResponseDto updateProfile(Long id, UpdateProfileRequestDto request) {
 		User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
+		
 		if (request.getFullName() != null)
 			user.setFullName(request.getFullName());
 		if (request.getBio() != null)
 			user.setBio(request.getBio());
 		if (request.getProfilePicUrl() != null) {
 			String profilePicUrl = request.getProfilePicUrl();
-			// Do not persist presigned query parameters; keep stable object URL/key length.
+
 			int queryIndex = profilePicUrl.indexOf('?');
 			user.setProfilePic(queryIndex >= 0 ? profilePicUrl.substring(0, queryIndex) : profilePicUrl);
 		}
 		return toUserResponseDto(userRepository.save(user));
 	}
 
+	
+	
 	@Override
 	public String uploadProfilePicture(Long id, MultipartFile file) {
+		
 		User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
 		String url = s3StorageService.uploadFile(file, "profiles");
 		user.setProfilePic(url);
@@ -69,17 +80,28 @@ public class UserServiceImpl implements UserService {
 		return s3StorageService.getAccessibleFileUrl(url);
 	}
 
+	
+	
 	@Override
-	public Page<UserResponseDto> getAllUsers(Pageable pageable) {
-		return userRepository.findAll(pageable).map(this::toUserResponseDto);
+	public Page<UserResponseDto> getAllUsers(Pageable pageable, String search, UserRole role) {
+		String normalizedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : "";
+		if (normalizedSearch.isEmpty() && role == null) {
+			return userRepository.findAll(pageable).map(this::toUserResponseDto);
+		}
+		return userRepository.findAllWithFilters(normalizedSearch, role, pageable).map(this::toUserResponseDto);
 	}
 
+	
+	
 	@Override
 	public UserResponseDto updateUserStatus(Long id, UserStatus status) {
 		User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
 		user.setStatus(status);
 		return toUserResponseDto(userRepository.save(user));
 	}
+	
+	
+	
 
 	@Override
 	public void deleteUser(Long id) {
@@ -87,6 +109,8 @@ public class UserServiceImpl implements UserService {
 			throw new ResourceNotFoundException("User", id);
 		userRepository.deleteById(id);
 	}
+	
+	
 
 	private UserResponseDto toUserResponseDto(User user) {
 		UserResponseDto dto = modelMapper.map(user, UserResponseDto.class);

@@ -21,6 +21,7 @@ import com.lms.notification.service.BadgeService;
 import com.lms.notification.repository.StudentBadgeRepository;
 import com.lms.notification.vo.BadgeType;
 import com.lms.shared.exception.ResourceNotFoundException;
+import com.lms.shared.exception.UnauthorizedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +45,8 @@ public class ProgressServiceImpl implements ProgressService {
 								.getCourse().getId())
 				.orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
 
+		validateEnrollmentAccess(enrollment);
+
 		LessonProgress progress = lessonProgressRepository
 				.findByEnrollmentIdAndLessonId(enrollment.getId(), request.getLessonId()).orElse(LessonProgress
 						.builder().enrollmentId(enrollment.getId()).lessonId(request.getLessonId()).build());
@@ -66,7 +69,14 @@ public class ProgressServiceImpl implements ProgressService {
 	public ProgressResponseDto getCourseProgress(Long studentId, Long courseId) {
 		Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(studentId, courseId)
 				.orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
+		validateEnrollmentAccess(enrollment);
 		return buildProgressResponse(enrollment);
+	}
+
+	private void validateEnrollmentAccess(Enrollment enrollment) {
+		if (enrollment.getExpiresAt() != null && LocalDateTime.now().isAfter(enrollment.getExpiresAt())) {
+			throw new UnauthorizedException("Your course access period has expired.");
+		}
 	}
 
 	private ProgressResponseDto buildProgressResponse(Enrollment enrollment) {

@@ -1,6 +1,7 @@
 package com.lms.course.service.impl;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,22 +12,30 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.lms.course.dto.request.QuizAnswerItemRequestDto;
 import com.lms.course.dto.request.QuizQuestionUpsertRequestDto;
 import com.lms.course.dto.request.QuizSubmitRequestDto;
+import com.lms.course.dto.response.QuizAttemptResponseDto;
 import com.lms.course.dto.response.QuizQuestionResponseDto;
 import com.lms.course.dto.response.QuizSubmitResponseDto;
 import com.lms.course.entity.Lesson;
+import com.lms.course.entity.QuizAttempt;
 import com.lms.course.entity.QuizQuestion;
+import com.lms.course.repository.QuizAttemptRepository;
 import com.lms.course.repository.QuizQuestionRepository;
 import com.lms.course.service.LessonService;
 import com.lms.course.service.QuizService;
 import com.lms.course.vo.ContentType;
+import com.lms.enrollment.entity.Enrollment;
 import com.lms.enrollment.entity.LearningEvent;
 import com.lms.enrollment.repository.EnrollmentRepository;
 import com.lms.enrollment.repository.LearningEventRepository;
 import com.lms.enrollment.vo.LearningEventType;
 import com.lms.shared.exception.BadRequestException;
+import com.lms.shared.exception.ResourceNotFoundException;
 import com.lms.shared.exception.UnauthorizedException;
 
 import lombok.RequiredArgsConstructor;
@@ -41,6 +50,8 @@ public class QuizServiceImpl implements QuizService {
 	private final LessonService lessonService;
 	private final EnrollmentRepository enrollmentRepository;
 	private final LearningEventRepository learningEventRepository;
+	private final QuizAttemptRepository quizAttemptRepository;
+	private final ObjectMapper objectMapper;
 
 	@Override
 	public List<QuizQuestionResponseDto> upsertQuizQuestions(Long instructorId, Long lessonId,
@@ -103,6 +114,11 @@ public class QuizServiceImpl implements QuizService {
 		Map<Long, QuizAnswerItemRequestDto> submittedAnswers = request.getAnswers().stream().collect(
 				Collectors.toMap(QuizAnswerItemRequestDto::getQuestionId, Function.identity(), (first, second) -> first));
 
+		Map<Long, List<String>> answersToPersist = submittedAnswers.entrySet().stream().collect(Collectors.toMap(
+				Map.Entry::getKey,
+				e -> normalizeOptions(e.getValue().getSelectedOptions()),
+				(first, second) -> first));
+
 		int correct = 0;
 		int attempted = 0;
 		List<QuizSubmitResponseDto.AnswerResultItemDto> resultItems = questions.stream()
@@ -139,6 +155,15 @@ public class QuizServiceImpl implements QuizService {
 		learningEventRepository.save(LearningEvent.builder().studentId(studentId).lessonId(lessonId)
 				.eventType(LearningEventType.QUIZ_SCORE).value(BigDecimal.valueOf(scorePercent)).build());
 
+		try {
+			QuizAttempt attempt = QuizAttempt.builder().studentId(studentId).courseId(lesson.getCourse().getId())
+					.quizId(lessonId).answersJson(objectMapper.writeValueAsString(answersToPersist))
+					.scorePercent(scorePercent).build();
+			quizAttemptRepository.save(attempt);
+		} catch (Exception e) {
+			throw new BadRequestException("Failed to store quiz attempt");
+		}
+
 		QuizSubmitResponseDto response = new QuizSubmitResponseDto();
 		response.setLessonId(lessonId);
 		response.setTotalQuestions(questions.size());
@@ -150,13 +175,35 @@ public class QuizServiceImpl implements QuizService {
 		return response;
 	}
 
+	@Override
+	public List<QuizAttemptResponseDto> getQuizAttempts(Long studentId, Long lessonId) {
+		Lesson lesson = lessonService.getLessonEntityById(lessonId);
+		validateQuizLesson(lesson);
+		validateStudentCanAccessQuiz(studentId, lesson);
+
+		return quizAttemptRepository.findByStudentIdAndQuizIdOrderBySubmittedAtDesc(studentId, lessonId).stream()
+				.map(this::toAttemptDto).toList();
+	}
+
+	@Override
+	public QuizAttemptResponseDto getLatestQuizAttempt(Long studentId, Long lessonId) {
+		Lesson lesson = lessonService.getLessonEntityById(lessonId);
+		validateQuizLesson(lesson);
+		validateStudentCanAccessQuiz(studentId, lesson);
+
+		QuizAttempt attempt = quizAttemptRepository.findTopByStudentIdAndQuizIdOrderBySubmittedAtDesc(studentId, lessonId)
+				.orElseThrow(() -> new ResourceNotFoundException("Quiz attempt not found"));
+		return toAttemptDto(attempt);
+	}
+
 	private void validateStudentCanAccessQuiz(Long studentId, Lesson lesson) {
 		if (lesson.getIsFreePreview()) {
 			return;
 		}
-		boolean isEnrolled = enrollmentRepository.existsByStudentIdAndCourseId(studentId, lesson.getCourse().getId());
-		if (!isEnrolled) {
-			throw new UnauthorizedException("Enroll to access this quiz");
+		Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(studentId, lesson.getCourse().getId())
+				.orElseThrow(() -> new UnauthorizedException("Enroll to access this quiz"));
+		if (enrollment.getExpiresAt() != null && LocalDateTime.now().isAfter(enrollment.getExpiresAt())) {
+			throw new UnauthorizedException("Your course access period has expired.");
 		}
 	}
 
@@ -198,5 +245,22 @@ public class QuizServiceImpl implements QuizService {
 			throw new BadRequestException("At least one valid option (A/B/C/D) is required");
 		}
 		return List.copyOf(normalized);
+	}
+
+	private QuizAttemptResponseDto toAttemptDto(QuizAttempt attempt) {
+		QuizAttemptResponseDto dto = new QuizAttemptResponseDto();
+		dto.setId(attempt.getId());
+		dto.setStudentId(attempt.getStudentId());
+		dto.setCourseId(attempt.getCourseId());
+		dto.setQuizId(attempt.getQuizId());
+		dto.setScorePercent(attempt.getScorePercent());
+		dto.setSubmittedAt(attempt.getSubmittedAt());
+		try {
+			dto.setAnswers(objectMapper.readValue(attempt.getAnswersJson(), new TypeReference<Map<Long, List<String>>>() {
+			}));
+		} catch (Exception e) {
+			dto.setAnswers(Map.of());
+		}
+		return dto;
 	}
 }

@@ -1,32 +1,27 @@
-package com.lms.enrollment.entity;
+package com.lms.course.entity;
 
 import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
 
-import com.lms.enrollment.vo.EnrollmentStatus;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "enrollments", uniqueConstraints = @UniqueConstraint(columnNames = { "student_id", "course_id" }))
+@Table(name = "quiz_attempts")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Enrollment {
+public class QuizAttempt {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,17 +33,16 @@ public class Enrollment {
 	@Column(name = "course_id", nullable = false)
 	private Long courseId;
 
-	@Enumerated(EnumType.STRING)
-	@Builder.Default
-	private EnrollmentStatus status = EnrollmentStatus.ACTIVE;
+	@Column(name = "quiz_id", nullable = false)
+	private Long quizId;
+
+	@Column(name = "answers_json", columnDefinition = "TEXT", nullable = false)
+	private String answersJson;
+
+	@Column(name = "score_percent")
+	private Double scorePercent;
 
 	@CreationTimestamp
-	@Column(name = "enrolled_at", updatable = false)
-	private LocalDateTime enrolledAt;
-
-	@Column(name = "expires_at")
-	private LocalDateTime expiresAt;
-
-	@Column(name = "completed_at")
-	private LocalDateTime completedAt;
+	@Column(name = "submitted_at", nullable = false, updatable = false)
+	private LocalDateTime submittedAt;
 }

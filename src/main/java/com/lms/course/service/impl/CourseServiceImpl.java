@@ -21,6 +21,7 @@ import com.lms.course.service.CourseService;
 import com.lms.course.service.S3StorageService;
 import com.lms.course.vo.CourseLevel;
 import com.lms.course.vo.CourseStatus;
+import com.lms.enrollment.repository.EnrollmentRepository;
 import com.lms.shared.exception.BadRequestException;
 import com.lms.shared.exception.ResourceNotFoundException;
 import com.lms.shared.exception.UnauthorizedException;
@@ -40,6 +41,7 @@ public class CourseServiceImpl implements CourseService {
 	private final ModelMapper modelMapper;
 	private final UserService userService;
 	private final EmailService emailService;
+	private final EnrollmentRepository enrollmentRepository;
 
 	@Override
 	public CourseResponseDto createCourse(Long instructorId, CreateCourseRequestDto request) {
@@ -66,17 +68,34 @@ public class CourseServiceImpl implements CourseService {
 	}
 
 	@Override
-	public Page<CourseSummaryResponseDto> getPublishedCourses(String category, String level, Pageable pageable) {
+	public Page<CourseSummaryResponseDto> getPublishedCourses(String category, String level, String search, Pageable pageable) {
+		String normalizedCategory = (category != null && !category.trim().isEmpty()) ? category.trim() : null;
+		String normalizedLevel = (level != null && !level.trim().isEmpty()) ? level.trim() : null;
+		String normalizedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
 		Page<Course> courses;
-		if (category != null && level != null) {
-			courses = courseRepository.findByStatusAndCategory(CourseStatus.PUBLISHED, category, pageable);
-		} else if (category != null) {
-			courses = courseRepository.findByStatusAndCategory(CourseStatus.PUBLISHED, category, pageable);
-		} else if (level != null) {
-			courses = courseRepository.findByStatusAndLevel(CourseStatus.PUBLISHED,
-					CourseLevel.valueOf(level.toUpperCase()), pageable);
+		boolean hasSearch = normalizedSearch != null;
+		
+		if (hasSearch) {
+			if (normalizedCategory != null && normalizedLevel != null) {
+				courses = courseRepository.findByStatusAndCategoryAndLevelAndSearchTerm(CourseStatus.PUBLISHED, normalizedCategory, CourseLevel.valueOf(normalizedLevel.toUpperCase()), normalizedSearch, pageable);
+			} else if (normalizedCategory != null) {
+				courses = courseRepository.findByStatusAndCategoryAndSearchTerm(CourseStatus.PUBLISHED, normalizedCategory, normalizedSearch, pageable);
+			} else if (normalizedLevel != null) {
+				courses = courseRepository.findByStatusAndLevelAndSearchTerm(CourseStatus.PUBLISHED, CourseLevel.valueOf(normalizedLevel.toUpperCase()), normalizedSearch, pageable);
+			} else {
+				courses = courseRepository.findByStatusAndSearchTerm(CourseStatus.PUBLISHED, normalizedSearch, pageable);
+			}
 		} else {
-			courses = courseRepository.findByStatus(CourseStatus.PUBLISHED, pageable);
+			if (normalizedCategory != null && normalizedLevel != null) {
+				courses = courseRepository.findByStatusAndCategoryAndLevel(CourseStatus.PUBLISHED, normalizedCategory, CourseLevel.valueOf(normalizedLevel.toUpperCase()), pageable);
+			} else if (normalizedCategory != null) {
+				courses = courseRepository.findByStatusAndCategory(CourseStatus.PUBLISHED, normalizedCategory, pageable);
+			} else if (normalizedLevel != null) {
+				courses = courseRepository.findByStatusAndLevel(CourseStatus.PUBLISHED, CourseLevel.valueOf(normalizedLevel.toUpperCase()), pageable);
+			} else {
+				courses = courseRepository.findByStatus(CourseStatus.PUBLISHED, pageable);
+			}
 		}
 		return courses.map(this::toCourseSummaryDto);
 	}
@@ -111,6 +130,7 @@ public class CourseServiceImpl implements CourseService {
 		Course course = getCourseEntityById(courseId);
 		if (!role.contains("ADMIN") && !course.getInstructorId().equals(userId))
 			throw new UnauthorizedException("Not authorized to delete this course");
+		enrollmentRepository.deleteByCourseId(courseId);
 		courseRepository.delete(course);
 	}
 

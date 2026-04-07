@@ -15,6 +15,9 @@ public class EnrollmentResponseDto {
 	private String courseThumbnailUrl;
 	private EnrollmentStatus status;
 	private LocalDateTime enrolledAt;
+	private LocalDateTime expiresAt;
 	private LocalDateTime completedAt;
 	private Double completionPercentage;
+	private Boolean accessExpired;
+	private Long remainingDays;
 }

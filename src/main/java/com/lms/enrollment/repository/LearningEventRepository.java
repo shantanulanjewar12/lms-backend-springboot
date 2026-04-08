@@ -1,5 +1,6 @@
 package com.lms.enrollment.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,12 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
 	void deleteByLessonId(Long lessonId);
 
 	List<LearningEvent> findByStudentIdAndEventType(Long studentId, LearningEventType eventType);
+
+	List<LearningEvent> findByStudentIdAndEventTypeInAndCreatedAtBetween(Long studentId,
+		List<LearningEventType> eventTypes, LocalDateTime from, LocalDateTime to);
+
+	List<LearningEvent> findByStudentIdAndCreatedAtBetween(Long studentId, LocalDateTime from,
+		LocalDateTime to);
 
 	long countByLessonIdAndEventType(Long lessonId, LearningEventType eventType);
 

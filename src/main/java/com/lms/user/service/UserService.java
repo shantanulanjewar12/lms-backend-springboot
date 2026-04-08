@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.lms.user.dto.request.UpdateProfileRequestDto;
 import com.lms.user.dto.response.UserResponseDto;
 import com.lms.user.entity.User;
+import com.lms.user.vo.UserRole;
 import com.lms.user.vo.UserStatus;
 
 public interface UserService {
@@ -20,7 +21,7 @@ public interface UserService {
 
 	String uploadProfilePicture(Long id, MultipartFile file);
 
-	Page<UserResponseDto> getAllUsers(Pageable pageable);
+	Page<UserResponseDto> getAllUsers(Pageable pageable, String search, UserRole role);
 
 	UserResponseDto updateUserStatus(Long id, UserStatus status);
 

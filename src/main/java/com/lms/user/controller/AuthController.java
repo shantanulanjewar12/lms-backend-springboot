@@ -34,21 +34,29 @@ public class AuthController {
 				.body(ApiResponse.success("User registered successfully", authService.register(request)));
 	}
 
+	
+	
 	@PostMapping("/login")
 	public ResponseEntity<ApiResponse<AuthResponseDto>> login(@Valid @RequestBody LoginRequestDto request) {
 		return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request)));
 	}
+	
+	
 
 	@PostMapping("/verify-otp")
 	public ResponseEntity<ApiResponse<AuthResponseDto>> verifyOtp(@Valid @RequestBody VerifyOtpRequestDto request) {
 		return ResponseEntity.ok(ApiResponse.success("Email verified successfully", authService.verifyOtp(request)));
 	}
 
+	
+	
 	@PostMapping("/resend-otp")
 	public ResponseEntity<ApiResponse<Void>> resendOtp(@Valid @RequestBody ResendOtpRequestDto request) {
 		authService.resendOtp(request);
 		return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
 	}
+	
+	
 
 	@PostMapping("/forgot-password")
 	public ResponseEntity<ApiResponse<Void>> requestForgotPasswordOtp(
@@ -57,6 +65,8 @@ public class AuthController {
 		return ResponseEntity.ok(ApiResponse.success("If account exists, password reset OTP has been sent"));
 	}
 
+	
+	
 	@PostMapping("/forgot-password/verify-otp")
 	public ResponseEntity<ApiResponse<Void>> verifyForgotPasswordOtp(
 			@Valid @RequestBody VerifyPasswordResetOtpRequestDto request) {
@@ -64,9 +74,13 @@ public class AuthController {
 		return ResponseEntity.ok(ApiResponse.success("OTP verified successfully"));
 	}
 
+	
+	
 	@PostMapping("/forgot-password/reset")
 	public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
 		authService.resetPassword(request);
 		return ResponseEntity.ok(ApiResponse.success("Password reset successful"));
 	}
+	
+	
 }

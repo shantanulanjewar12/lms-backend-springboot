@@ -35,8 +35,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CourseController {
 
+	
 	private final CourseService courseService;
 
+	
 	@PostMapping
 	@PreAuthorize("hasRole('INSTRUCTOR')")
 	public ResponseEntity<ApiResponse<CourseResponseDto>> createCourse(Authentication auth,
@@ -46,14 +48,19 @@ public class CourseController {
 				.body(ApiResponse.success("Course created", courseService.createCourse(userId, request)));
 	}
 
+	
+	
 	@GetMapping
 	public ResponseEntity<ApiResponse<Page<CourseSummaryResponseDto>>> getPublishedCourses(
 			@RequestParam(required = false) String category, @RequestParam(required = false) String level,
+			@RequestParam(required = false) String search,
 			@PageableDefault(size = 10) Pageable pageable) {
 		return ResponseEntity.ok(
-				ApiResponse.success("Courses fetched", courseService.getPublishedCourses(category, level, pageable)));
+				ApiResponse.success("Courses fetched", courseService.getPublishedCourses(category, level, search, pageable)));
 	}
 
+	
+	
 	@GetMapping("/instructor/my")
 	@PreAuthorize("hasRole('INSTRUCTOR')")
 	public ResponseEntity<ApiResponse<Page<CourseSummaryResponseDto>>> getMyCourses(Authentication auth,
@@ -63,11 +70,15 @@ public class CourseController {
 				courseService.getInstructorCourses(userId, pageable)));
 	}
 
+	
+	
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<CourseResponseDto>> getCourse(@PathVariable Long id) {
 		return ResponseEntity.ok(ApiResponse.success("Course fetched", courseService.getCourseById(id)));
 	}
 
+	
+	
 	@PutMapping("/{id}")
 	@PreAuthorize("hasRole('INSTRUCTOR')")
 	public ResponseEntity<ApiResponse<CourseResponseDto>> updateCourse(@PathVariable Long id, Authentication auth,
@@ -76,6 +87,8 @@ public class CourseController {
 		return ResponseEntity
 				.ok(ApiResponse.success("Course updated", courseService.updateCourse(id, userId, request)));
 	}
+	
+	
 
 	@DeleteMapping("/{id}")
 	@PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
@@ -85,6 +98,8 @@ public class CourseController {
 		courseService.deleteCourse(id, userId, role);
 		return ResponseEntity.ok(ApiResponse.success("Course deleted"));
 	}
+	
+	
 
 	@PatchMapping("/{id}/publish")
 	@PreAuthorize("hasRole('INSTRUCTOR')")
@@ -92,6 +107,9 @@ public class CourseController {
 		Long userId = (Long) auth.getCredentials();
 		return ResponseEntity.ok(ApiResponse.success("Course published", courseService.publishCourse(id, userId)));
 	}
+	
+	
+	
 
 	@PostMapping(value = "/{id}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@PreAuthorize("hasRole('INSTRUCTOR')")

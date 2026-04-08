@@ -21,7 +21,7 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private long expiration;
 
-    private SecretKey getSigningKey() {
+    private SecretKey getSigningKey() {  //Creates a secure HMAC SHA key
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 

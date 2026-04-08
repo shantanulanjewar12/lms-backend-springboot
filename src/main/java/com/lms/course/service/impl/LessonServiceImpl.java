@@ -1,5 +1,6 @@
 package com.lms.course.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
@@ -16,6 +17,8 @@ import com.lms.course.repository.QuizQuestionRepository;
 import com.lms.course.service.CourseService;
 import com.lms.course.service.LessonService;
 import com.lms.course.service.S3StorageService;
+import com.lms.enrollment.entity.Enrollment;
+import com.lms.enrollment.repository.EnrollmentRepository;
 import com.lms.enrollment.repository.LearningEventRepository;
 import com.lms.enrollment.repository.LessonProgressRepository;
 import com.lms.shared.exception.ResourceNotFoundException;
@@ -34,6 +37,7 @@ public class LessonServiceImpl implements LessonService {
 	private final QuizQuestionRepository quizQuestionRepository;
 	private final LessonProgressRepository lessonProgressRepository;
 	private final LearningEventRepository learningEventRepository;
+	private final EnrollmentRepository enrollmentRepository;
 
 	@Override
 	public LessonResponseDto createLesson(Long instructorId, CreateLessonRequestDto request, MultipartFile file) {
@@ -54,8 +58,29 @@ public class LessonServiceImpl implements LessonService {
 
 	@Override
 	public List<LessonResponseDto> getLessonsByCourse(Long courseId, Long userId, String role) {
-		return lessonRepository.findByCourseIdOrderByOrderIndex(courseId).stream().map(this::toLessonResponseDto)
-				.toList();
+		List<Lesson> lessons = lessonRepository.findByCourseIdOrderByOrderIndex(courseId);
+
+		boolean isPrivileged = role != null && (role.contains("INSTRUCTOR") || role.contains("ADMIN"));
+		boolean hasFullAccess = isPrivileged;
+
+		if (!isPrivileged && role != null && role.contains("STUDENT") && userId != null) {
+			Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(userId, courseId).orElse(null);
+			if (enrollment != null) {
+				if (enrollment.getExpiresAt() != null && LocalDateTime.now().isAfter(enrollment.getExpiresAt())) {
+					throw new UnauthorizedException("Your course access period has expired.");
+				}
+				hasFullAccess = true;
+			}
+		}
+
+		final boolean allowAllContent = hasFullAccess;
+		return lessons.stream().map(lesson -> {
+			LessonResponseDto dto = toLessonResponseDto(lesson);
+			if (!allowAllContent && !Boolean.TRUE.equals(lesson.getIsFreePreview())) {
+				dto.setContentUrl(null);
+			}
+			return dto;
+		}).toList();
 	}
 
 	@Override

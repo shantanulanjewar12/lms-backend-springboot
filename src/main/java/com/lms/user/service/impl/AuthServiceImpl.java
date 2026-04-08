@@ -42,15 +42,19 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public AuthResponseDto register(RegisterRequestDto request) {
+		
 		if (userRepository.existsByEmail(request.getEmail())) {
 			throw new BadRequestException("Email already registered: " + request.getEmail());
 		}
+		
 		String otp = generateOtp();
+		
 		LocalDateTime expiry = LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES);
 
 		User user = User.builder().fullName(request.getFullName()).email(request.getEmail())
 				.passwordHash(passwordEncoder.encode(request.getPassword())).role(request.getRole()).emailVerified(false)
 				.emailOtp(otp).emailOtpExpiresAt(expiry).build();
+		
 		User saved = userRepository.save(user);
 
 		emailService.sendRegistrationOtpEmail(saved.getEmail(), saved.getFullName(), otp);
@@ -60,8 +64,9 @@ public class AuthServiceImpl implements AuthService {
 
 	@Override
 	public AuthResponseDto verifyOtp(VerifyOtpRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail())
-				.orElseThrow(() -> new BadRequestException("User not found with this email"));
+				.orElseThrow(() -> new BadRequestException("User not found with this email."));
 
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BadRequestException("Your account is not active. Please contact support.");
@@ -70,12 +75,15 @@ public class AuthServiceImpl implements AuthService {
 		if (Boolean.TRUE.equals(user.getEmailVerified())) {
 			throw new BadRequestException("Email is already verified");
 		}
+		
 		if (user.getEmailOtp() == null || user.getEmailOtpExpiresAt() == null) {
 			throw new BadRequestException("OTP not generated. Please request a new OTP.");
 		}
+		
 		if (LocalDateTime.now().isAfter(user.getEmailOtpExpiresAt())) {
 			throw new BadRequestException("OTP has expired. Please request a new OTP.");
 		}
+		
 		if (!request.getOtp().equals(user.getEmailOtp())) {
 			throw new BadRequestException("Invalid OTP");
 		}
@@ -91,8 +99,11 @@ public class AuthServiceImpl implements AuthService {
 		return AuthResponseDto.builder().accessToken(token).user(toUserResponseDto(saved)).build();
 	}
 
+	
+	
 	@Override
 	public void resendOtp(ResendOtpRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail())
 				.orElseThrow(() -> new BadRequestException("User not found with this email"));
 
@@ -108,32 +119,43 @@ public class AuthServiceImpl implements AuthService {
 		emailService.sendRegistrationOtpEmail(user.getEmail(), user.getFullName(), otp);
 	}
 
+	
 	@Override
 	public AuthResponseDto login(LoginRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail())
 				.orElseThrow(() -> new BadRequestException("Invalid email or password"));
+		
 		if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
 			throw new BadRequestException("Invalid email or password");
 		}
+		
 		if (!Boolean.TRUE.equals(user.getEmailVerified())) {
 			throw new BadRequestException("Please verify your email before logging in");
 		}
+		
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BadRequestException("Your account is suspended or inactive. Please contact support.");
 		}
+		
 		String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
 		return AuthResponseDto.builder().accessToken(token).user(toUserResponseDto(user)).build();
 	}
 
+	
 	private UserResponseDto toUserResponseDto(User user) {
 		UserResponseDto dto = modelMapper.map(user, UserResponseDto.class);
 		dto.setProfilePic(s3StorageService.getAccessibleFileUrl(dto.getProfilePic()));
 		return dto;
 	}
 
+	
+	
 	@Override
 	public void requestPasswordResetOtp(ForgotPasswordRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+		
 		if (user == null) {
 			return;
 		}
@@ -150,21 +172,27 @@ public class AuthServiceImpl implements AuthService {
 
 		emailService.sendPasswordResetOtpEmail(user.getEmail(), user.getFullName(), otp);
 	}
+	
+	
 
 	@Override
 	public void verifyPasswordResetOtp(VerifyPasswordResetOtpRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail())
 				.orElseThrow(() -> new BadRequestException("Invalid email or OTP"));
 
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BadRequestException("Your account is not active. Please contact support.");
 		}
+		
 		if (user.getPasswordResetOtp() == null || user.getPasswordResetOtpExpiresAt() == null) {
 			throw new BadRequestException("Reset OTP not generated. Please request a new OTP.");
 		}
+		
 		if (LocalDateTime.now().isAfter(user.getPasswordResetOtpExpiresAt())) {
 			throw new BadRequestException("Reset OTP has expired. Please request a new OTP.");
 		}
+		
 		if (!request.getOtp().equals(user.getPasswordResetOtp())) {
 			throw new BadRequestException("Invalid OTP");
 		}
@@ -172,27 +200,35 @@ public class AuthServiceImpl implements AuthService {
 		user.setPasswordResetOtpVerified(true);
 		userRepository.save(user);
 	}
+	
+	
 
 	@Override
 	public void resetPassword(ResetPasswordRequestDto request) {
+		
 		User user = userRepository.findByEmail(request.getEmail())
 				.orElseThrow(() -> new BadRequestException("Invalid reset request"));
 
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BadRequestException("Your account is not active. Please contact support.");
 		}
+		
 		if (!request.getNewPassword().equals(request.getConfirmPassword())) {
 			throw new BadRequestException("New password and confirm password do not match");
 		}
+		
 		if (user.getPasswordResetOtp() == null || user.getPasswordResetOtpExpiresAt() == null) {
 			throw new BadRequestException("Reset OTP not generated. Please request a new OTP.");
 		}
+		
 		if (LocalDateTime.now().isAfter(user.getPasswordResetOtpExpiresAt())) {
 			throw new BadRequestException("Reset OTP has expired. Please request a new OTP.");
 		}
+		
 		if (!request.getOtp().equals(user.getPasswordResetOtp())) {
 			throw new BadRequestException("Invalid OTP");
 		}
+		
 		if (!Boolean.TRUE.equals(user.getPasswordResetOtpVerified())) {
 			throw new BadRequestException("Please verify reset OTP before changing password");
 		}
@@ -204,7 +240,10 @@ public class AuthServiceImpl implements AuthService {
 		userRepository.save(user);
 	}
 
+	
+	
 	private String generateOtp() {
+		
 		int otp = ThreadLocalRandom.current().nextInt(100000, 1000000);
 		return String.valueOf(otp);
 	}

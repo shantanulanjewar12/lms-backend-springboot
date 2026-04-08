@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.lms.course.dto.request.CreateLessonRequestDto;
 import com.lms.course.dto.request.QuizQuestionUpsertRequestDto;
 import com.lms.course.dto.request.QuizSubmitRequestDto;
+import com.lms.course.dto.response.QuizAttemptResponseDto;
 import com.lms.course.dto.response.LessonResponseDto;
 import com.lms.course.dto.response.QuizQuestionResponseDto;
 import com.lms.course.dto.response.QuizSubmitResponseDto;
@@ -98,5 +99,22 @@ public class LessonController {
 		Long userId = (Long) auth.getCredentials();
 		return ResponseEntity
 				.ok(ApiResponse.success("Quiz submitted", quizService.submitQuiz(userId, id, request)));
+	}
+
+	@GetMapping("/api/v1/lessons/{id}/quiz/attempts")
+	@PreAuthorize("hasRole('STUDENT')")
+	public ResponseEntity<ApiResponse<List<QuizAttemptResponseDto>>> getQuizAttempts(@PathVariable Long id,
+			Authentication auth) {
+		Long userId = (Long) auth.getCredentials();
+		return ResponseEntity.ok(ApiResponse.success("Quiz attempts fetched", quizService.getQuizAttempts(userId, id)));
+	}
+
+	@GetMapping("/api/v1/lessons/{id}/quiz/attempts/latest")
+	@PreAuthorize("hasRole('STUDENT')")
+	public ResponseEntity<ApiResponse<QuizAttemptResponseDto>> getLatestQuizAttempt(@PathVariable Long id,
+			Authentication auth) {
+		Long userId = (Long) auth.getCredentials();
+		return ResponseEntity
+				.ok(ApiResponse.success("Latest quiz attempt fetched", quizService.getLatestQuizAttempt(userId, id)));
 	}
 }

@@ -46,6 +46,23 @@ public class Enrollment {
 	@Column(name = "enrolled_at", updatable = false)
 	private LocalDateTime enrolledAt;
 
+	@Column(name = "expires_at")
+	private LocalDateTime expiresAt;
+
 	@Column(name = "completed_at")
 	private LocalDateTime completedAt;
+
+	@Column(name = "access_duration_days")
+	private Integer accessDurationDays;
+
+	@Builder.Default
+	@Column(name = "progress_percentage")
+	private Double progressPercentage = 0.0;
+
+	@Builder.Default
+	@Column(name = "total_time_spent_seconds")
+	private Long totalTimeSpentSeconds = 0L;
+
+	@Column(name = "last_accessed_at")
+	private LocalDateTime lastAccessedAt;
 }

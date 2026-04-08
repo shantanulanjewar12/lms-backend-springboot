@@ -76,12 +76,40 @@ public class InstructorAnalyticsController {
 	public ResponseEntity<ApiResponse<CourseEngagementResponseDto>> getEngagement(@PathVariable Long id,
 			Authentication auth) {
 		enforceCourseOwnershipOrAdmin(auth, id);
-		long totalEnrollments = enrollmentRepository.countByCourseId(id);
+		List<Enrollment> enrollments = enrollmentRepository.findByCourseId(id);
+		long totalEnrollments = enrollments.size();
+		long totalLessons = lessonRepository.countByCourseId(id);
+
+		long completedEnrollments = 0;
+		double totalWatchSeconds = 0.0;
+
+		for (Enrollment enrollment : enrollments) {
+			long completedLessons = lessonProgressRepository.countByEnrollmentIdAndIsCompletedTrue(enrollment.getId());
+			if (totalLessons > 0 && completedLessons >= totalLessons) {
+				completedEnrollments++;
+			}
+
+			int enrollmentWatchSeconds = lessonProgressRepository.findByEnrollmentId(enrollment.getId()).stream()
+					.mapToInt(lp -> lp.getWatchDurationSeconds() == null ? 0 : lp.getWatchDurationSeconds())
+					.sum();
+			totalWatchSeconds += enrollmentWatchSeconds;
+		}
+
+		double completionRate = totalEnrollments > 0 ? (completedEnrollments * 100.0) / totalEnrollments : 0.0;
+		double averageWatchTimeSeconds = totalEnrollments > 0 ? totalWatchSeconds / totalEnrollments : 0.0;
+
+		Long dropOffLessonId = lessonDifficultyService.getDifficultyForCourse(id).stream()
+				.max(java.util.Comparator.comparingDouble(d -> d.getDropOffRate() == null ? 0.0 : d.getDropOffRate()))
+				.filter(d -> d.getDropOffRate() != null && d.getDropOffRate() > 0)
+				.map(LessonDifficultyResponseDto::getLessonId)
+				.orElse(null);
+
 		CourseEngagementResponseDto dto = new CourseEngagementResponseDto();
 		dto.setCourseId(id);
 		dto.setTotalEnrollments(totalEnrollments);
-		dto.setCompletionRate(0.0);
-		dto.setAverageWatchTimeSeconds(0.0);
+		dto.setCompletionRate(completionRate);
+		dto.setAverageWatchTimeSeconds(averageWatchTimeSeconds);
+		dto.setDropOffLessonId(dropOffLessonId);
 		return ResponseEntity.ok(ApiResponse.success("Course engagement", dto));
 	}
 

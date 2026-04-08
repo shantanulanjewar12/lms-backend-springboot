@@ -22,6 +22,7 @@ import com.lms.shared.jwt.JwtUtil;
 import com.lms.user.dto.request.UpdateProfileRequestDto;
 import com.lms.user.dto.response.UserResponseDto;
 import com.lms.user.service.UserService;
+import com.lms.user.vo.UserRole;
 import com.lms.user.vo.UserStatus;
 
 import lombok.RequiredArgsConstructor;
@@ -34,11 +35,15 @@ public class UserController {
 	private final UserService userService;
 	private final JwtUtil jwtUtil;
 
+	
+	
 	@GetMapping("/me")
 	public ResponseEntity<ApiResponse<UserResponseDto>> getMyProfile(Authentication auth) {
 		Long userId = (Long) auth.getCredentials();
 		return ResponseEntity.ok(ApiResponse.success("Profile fetched", userService.getUserById(userId)));
 	}
+	
+	
 
 	@PutMapping("/me")
 	public ResponseEntity<ApiResponse<UserResponseDto>> updateMyProfile(Authentication auth,
@@ -47,26 +52,38 @@ public class UserController {
 		return ResponseEntity.ok(ApiResponse.success("Profile updated", userService.updateProfile(userId, request)));
 	}
 
+	
+	
+	
 	@PostMapping("/me/profile-picture")
 	public ResponseEntity<ApiResponse<String>> uploadProfilePicture(Authentication auth,
 			@RequestParam("file") MultipartFile file) {
 		Long userId = (Long) auth.getCredentials();
-		return ResponseEntity.ok(ApiResponse.success("Profile picture uploaded",
-				userService.uploadProfilePicture(userId, file)));
+		return ResponseEntity
+				.ok(ApiResponse.success("Profile picture uploaded", userService.uploadProfilePicture(userId, file)));
 	}
 
+	
+	
 	@GetMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse<UserResponseDto>> getUserById(@PathVariable Long id) {
 		return ResponseEntity.ok(ApiResponse.success("User fetched", userService.getUserById(id)));
 	}
+	
+	
 
 	@GetMapping
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse<Page<UserResponseDto>>> getAllUsers(
+			@RequestParam(required = false) String search,
+			@RequestParam(required = false) UserRole role,
 			@PageableDefault(size = 10) Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success("Users fetched", userService.getAllUsers(pageable)));
+		return ResponseEntity.ok(ApiResponse.success("Users fetched", userService.getAllUsers(pageable, search, role)));
 	}
+	
+	
+	
 
 	@PutMapping("/{id}/status")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -75,10 +92,15 @@ public class UserController {
 		return ResponseEntity.ok(ApiResponse.success("Status updated", userService.updateUserStatus(id, status)));
 	}
 
+	
+	
+	
 	@DeleteMapping("/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
 		userService.deleteUser(id);
 		return ResponseEntity.ok(ApiResponse.success("User deleted"));
 	}
+	
+	
 }

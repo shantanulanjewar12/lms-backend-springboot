@@ -15,7 +15,7 @@ public interface CourseService {
 
 	Page<CourseSummaryResponseDto> getInstructorCourses(Long instructorId, Pageable pageable);
 
-	Page<CourseSummaryResponseDto> getPublishedCourses(String category, String level, Pageable pageable);
+	Page<CourseSummaryResponseDto> getPublishedCourses(String category, String level, String search, Pageable pageable);
 
 	CourseResponseDto getCourseById(Long id);
 

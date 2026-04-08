@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthResponseDto {
+	
     private String accessToken;
     @Builder.Default private String tokenType = "Bearer";
     @Builder.Default private long expiresIn = 86400000L;
     private UserResponseDto user;
+    
 }
